@@ -5,7 +5,7 @@ import os
 
 app = FastAPI()
 
-# 1. Main Browser & UI (HTML, CSS, JS combined in single file)
+# 1. Main Browser & UI Interface
 @app.get("/", response_class=HTMLResponse)
 def home_page():
     return """
@@ -40,7 +40,7 @@ def home_page():
     <!-- Browser View -->
     <iframe id="browser-frame" src="https://www.youtube.com"></iframe>
 
-    <!-- Quality Selection Popup Modal -->
+    <!-- Quality Selection Popup -->
     <div id="qualityModal">
         <h3>எந்த Quality வேண்டும்?</h3>
         <div id="qualityList"></div>
@@ -54,25 +54,20 @@ def home_page():
     </div>
 
     <script>
-        // Handle URL Navigation
         function handleSearch(e) {
             if (e.key === 'Enter') {
                 let url = document.getElementById('url-bar').value;
                 if(!url.startsWith('http')) url = 'https://' + url;
                 document.getElementById('browser-frame').src = url;
-                
-                // If YouTube link, check qualities
                 if(url.includes('youtube.com') || url.includes('youtu.be')) {
                     fetchQualities(url);
                 }
             }
         }
 
-        // 2 & 3. Fetch & Prompt Quality Options
         function fetchQualities(videoUrl) {
             let formData = new FormData();
             formData.append('url', videoUrl);
-            
             fetch('/get-youtube-qualities', { method: 'POST', body: formData })
             .then(res => res.json())
             .then(data => {
@@ -92,7 +87,6 @@ def home_page():
         function downloadWithQuality(fileUrl, title) {
             closeModal();
             document.getElementById('tick-status').innerText = 'Downloading ' + title + '...';
-            
             let formData = new FormData();
             formData.append('file_url', fileUrl);
             formData.append('folder_name', 'YouTube_Downloads');
@@ -101,11 +95,10 @@ def home_page():
             .then(res => res.json())
             .then(data => {
                 document.getElementById('tick-status').innerText = 'Downloaded Successfully!';
-                document.getElementById('double-tick').style.display = 'inline'; // 4. Double Tick
+                document.getElementById('double-tick').style.display = 'inline';
             });
         }
 
-        // 5 & 6. Website Folder Long-Press & Sub-folder download
         let pressTimer;
         document.addEventListener('touchstart', function(e) {
             if (e.target.tagName === 'A') {
@@ -113,7 +106,7 @@ def home_page():
                     let folderName = e.target.innerText || "Downloaded_Folder";
                     let folderUrl = e.target.href;
                     triggerFolderDownload(folderName, folderUrl);
-                }, 1000); // 1 second long press
+                }, 1000);
             }
         });
         document.addEventListener('touchend', () => clearTimeout(pressTimer));
@@ -132,7 +125,6 @@ def home_page():
             });
         }
 
-        // 10. Toolbar Features Actions
         function toggleDesktopMode() { alert("Desktop mode toggled."); }
         function openBookmarks() { alert("Opening Bookmarks Page..."); }
         function openDownloads() { alert("Opening Downloaded Page..."); }
@@ -143,7 +135,6 @@ def home_page():
 </html>
     """
 
-# 2. YouTube Quality Selector API
 @app.post("/get-youtube-qualities")
 def get_qualities(url: str = Form(...)):
     ydl_opts = {'extract_flat': True}
@@ -153,26 +144,20 @@ def get_qualities(url: str = Form(...)):
             formats = []
             for f in info.get('formats', []):
                 if f.get('height') and f.get('ext') == 'mp4':
-                    formats.append({
-                        'resolution': f"{f['height']}p",
-                        'url': f['url']
-                    })
+                    formats.append({'resolution': f"{f['height']}p", 'url': f['url']})
             seen = set()
             unique_formats = [x for x in formats if x['resolution'] not in seen and not seen.add(x['resolution'])]
             return {"title": info.get('title', 'Video'), "formats": unique_formats}
         except Exception as e:
             return {"title": "Error", "formats": [{'resolution': 'Default 360p', 'url': url}]}
 
-# 3, 5, 6, 7. Download Item & Sub-folder Handler for All Websites
 @app.post("/download-item")
 def download_item(file_url: str = Form(...), folder_name: str = Form(...)):
-    safe_folder = "".-join([c for c in folder_name if c.isalnum() or c in (' ', '_')]).strip()
+    safe_folder = "".join([c for c in folder_name if c.isalnum() or c in (' ', '_')]).strip()
     save_path = os.path.expanduser(f"~/Download/ABH_Downloader/{safe_folder}")
     os.makedirs(save_path, exist_ok=True)
     
-    ydl_opts = {
-        'outtmpl': os.path.join(save_path, '%(title)s.%(ext)s'),
-    }
+    ydl_opts = {'outtmpl': os.path.join(save_path, '%(title)s.%(ext)s')}
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             ydl.download([file_url])
